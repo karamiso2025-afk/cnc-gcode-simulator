@@ -708,7 +708,18 @@ export default function Viewer3D({
       aria-label="3Dビューア"
     >
       <Canvas
-        gl={{ alpha: false, antialias: true }}
+        gl={{
+          alpha: false,
+          antialias: true,
+          powerPreference: 'default',
+          failIfMajorPerformanceCaveat: false,
+        }}
+        onCreated={({ gl }) => {
+          // Force WebGL1 compatibility for older GPUs
+          if (!gl.capabilities.isWebGL2) {
+            console.warn('WebGL2 not available, using WebGL1 fallback');
+          }
+        }}
         camera={{
           position: [cameraDistance * 0.7, cameraDistance * 0.5, cameraDistance * 0.7],
           fov: 50,
@@ -716,6 +727,7 @@ export default function Viewer3D({
           far: 100000,
         }}
         style={{ width: '100%', height: '100%' }}
+        fallback={<div className="flex items-center justify-center w-full h-full text-white bg-zinc-900"><p className="text-center px-8">WebGLに対応していないブラウザです。<br/>Chrome/Edge/Firefoxの最新版をお試しください。</p></div>}
       >
         <color attach="background" args={['#09090b']} />
         <ambientLight intensity={0.6} />
