@@ -1,9 +1,53 @@
 'use client';
-import React, { useRef, useMemo, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useEffect, useState, Component, type ErrorInfo, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Viewer3DProps, PathSegment, BoundingBox, Point3D } from '../shared-types';
+
+/* ---------- WebGL detection & Error Boundary ---------- */
+function supportsWebGL(): boolean {
+  if (typeof window === 'undefined') return true; // SSR
+  try {
+    const cvs = document.createElement('canvas');
+    return !!(cvs.getContext('webgl2') || cvs.getContext('webgl') || cvs.getContext('experimental-webgl'));
+  } catch { return false; }
+}
+
+function WebGLUnsupported(): JSX.Element {
+  return (
+    <div className="flex items-center justify-center w-full h-full bg-zinc-900 text-white p-8">
+      <div className="text-center max-w-md space-y-4">
+        <p className="text-2xl font-bold text-red-400">⚠ WebGL非対応</p>
+        <p>お使いのPC（グラフィックボード）はWebGL 3D描画に対応していません。</p>
+        <div className="text-left text-sm text-zinc-400 space-y-1">
+          <p>■ 対処法:</p>
+          <p>・Chrome/Edgeを最新版に更新</p>
+          <p>・chrome://flags → WebGL Draft Extensions を有効化</p>
+          <p>・グラフィックドライバーを最新版に更新</p>
+          <p>・GPUが古すぎる場合は新しいPCをお試しください</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+class WebGLErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('WebGL Error:', error, info);
+  }
+  render(): ReactNode {
+    if (this.state.hasError) return <WebGLUnsupported />;
+    return this.props.children;
+  }
+}
 
 type Props = Partial<Viewer3DProps>;
 
@@ -701,12 +745,16 @@ export default function Viewer3D({
     return Math.max(dx, dy, dz, 50) * 1.5;
   }, [boundingBox]);
 
+  const [webglOk] = useState(() => supportsWebGL());
+  if (!webglOk) return <WebGLUnsupported />;
+
   return (
     <div
       data-testid="viewer3-d"
       className="relative w-full h-full bg-background"
       aria-label="3Dビューア"
     >
+      <WebGLErrorBoundary>
       <Canvas
         gl={{
           alpha: false,
@@ -785,6 +833,7 @@ export default function Viewer3D({
           toolDiameter={toolDiameter ?? 0}
         />
       </Canvas>
+      </WebGLErrorBoundary>
     </div>
   );
 }
